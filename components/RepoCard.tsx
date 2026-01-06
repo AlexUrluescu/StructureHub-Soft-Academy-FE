@@ -10,22 +10,31 @@ import {
   CheckCircle2,
   Loader2,
 } from "lucide-react";
+import Link from "next/link";
 
 interface RepoProps {
+  id: number;
   name: string;
   description: string;
   language: string;
   stars: number;
 }
 
-export const RepoCard = ({ name, description, language, stars }: RepoProps) => {
+export const RepoCard = ({
+  id,
+  name,
+  description,
+  language,
+  stars,
+}: RepoProps) => {
   const [status, setStatus] = useState<"idle" | "processing" | "done">("idle");
 
-  const handleGenerate = () => {
-    setStatus("processing");
-    // Simulate AI delay
-    setTimeout(() => setStatus("done"), 3000);
-  };
+  // const handleGenerate = () => {
+  //   // setStatus("processing");
+  //   // Simulate AI delay
+  //   // setTimeout(() => setStatus("done"), 3000);
+  //   console.log(`Generating docs for ${id}...`);
+  // };
 
   return (
     <motion.div
@@ -33,7 +42,6 @@ export const RepoCard = ({ name, description, language, stars }: RepoProps) => {
       animate={{ opacity: 1, y: 0 }}
       className="group relative bg-slate-950/40 backdrop-blur-md border border-white/5 rounded-xl p-6 hover:border-cyan-500/30 transition-all duration-300 hover:shadow-[0_0_30px_-10px_rgba(8,145,178,0.3)]"
     >
-      {/* Hover Gradient Overlay */}
       <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
 
       <div className="relative z-10 flex flex-col h-full">
@@ -68,47 +76,11 @@ export const RepoCard = ({ name, description, language, stars }: RepoProps) => {
             />
             {language}
           </div>
-
-          <button
-            onClick={handleGenerate}
-            disabled={status !== "idle"}
-            className={`
-              relative overflow-hidden px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex items-center gap-2
-              ${
-                status === "idle"
-                  ? "bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500 hover:text-white border border-cyan-500/20"
-                  : ""
-              }
-              ${
-                status === "processing"
-                  ? "bg-purple-500/10 text-purple-400 border border-purple-500/20 cursor-wait"
-                  : ""
-              }
-              ${
-                status === "done"
-                  ? "bg-green-500/10 text-green-400 border border-green-500/20"
-                  : ""
-              }
-            `}
-          >
-            {status === "idle" && (
-              <>
-                <Zap className="w-4 h-4" /> Synthesize
-              </>
-            )}
-
-            {status === "processing" && (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" /> Analyzing...
-              </>
-            )}
-
-            {status === "done" && (
-              <>
-                <CheckCircle2 className="w-4 h-4" /> Docs Ready
-              </>
-            )}
-          </button>
+          <Link href={`/documentation/${id}`}>
+            <button className="px-4 py-2 rounded-lg text-sm font-medium bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500 hover:text-white border border-cyan-500/20 transition-colors">
+              View Docs
+            </button>
+          </Link>
         </div>
       </div>
     </motion.div>
