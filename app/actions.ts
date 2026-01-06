@@ -23,3 +23,9 @@ export async function removeToken() {
   cookieStore.delete("github_token");
   revalidatePath("/");
 }
+
+export async function removeAuthToken() {
+  const cookieStore = await cookies();
+  cookieStore.delete("auth_token");
+  revalidatePath("/");
+}
