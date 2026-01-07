@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Bot,
   FileText,
@@ -12,7 +12,16 @@ import {
   Zap,
 } from "lucide-react";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
+import axios from "axios";
+import ReactMarkdown from "react-markdown";
+import mermaid from "mermaid";
+import MermaidDiagram from "./MermaidDiagram";
+import RefreshCw from "./IconHelper";
+
+if (typeof window !== "undefined") {
+  mermaid.initialize({ startOnLoad: false, theme: "dark" });
+}
 
 interface RepoDetailViewProps {
   repo: {
@@ -23,44 +32,119 @@ interface RepoDetailViewProps {
     stars: number;
     lastUpdated: string;
     branch: string;
+    html_url: string;
   };
+  authToken: string;
 }
 
-export default function RepoDetailView({ repo }: RepoDetailViewProps) {
+interface JobResult {
+  summary: string;
+  architecture_diagram: string;
+  files: any[];
+  readme: string;
+}
+
+export default function RepoDetailView({
+  repo,
+  authToken,
+}: RepoDetailViewProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
-  const [showDocs, setShowDocs] = useState(false);
+  const [jobId, setJobId] = useState<number | null>(null);
+  const [result, setResult] = useState<JobResult | null>(null);
+  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(
+    null
+  );
 
   const handleGenerate = async () => {
     setIsGenerating(true);
-    setLogs([]);
-    setShowDocs(false);
+    setLogs((prev) => [...prev, "> Initializing connection to Neural Core..."]);
 
-    // Simulate a "Neural Processing" sequence
-    const steps = [
-      "Initializing neural link...",
-      `Scanning repository: ${repo.name}...`,
-      "Parsing Abstract Syntax Tree...",
-      "Identifying dependencies...",
-      "Synthesizing documentation modules...",
-      "Finalizing output...",
-    ];
+    const data = {
+      repo_url: repo.html_url,
+      repo_name: repo.name,
+    };
+    console.log("Sending data to backend:", data);
 
-    for (const step of steps) {
-      setLogs((prev) => [...prev, `> ${step}`]);
-      await new Promise((r) => setTimeout(r, 800)); // Fake delay
+    try {
+      // Call Laravel Endpoint
+      const response = await axios.post(
+        "http://localhost:8000/api/generate",
+        {
+          repo_url: repo.html_url,
+          repo_name: repo.name,
+        },
+        {
+          // ADD HEADERS HERE
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+            Accept: "application/json",
+          },
+        }
+      );
+
+      console.log("Response from /api/generate:", response.data);
+
+      const { job_id } = response.data;
+      setJobId(job_id);
+      setLogs((prev) => [...prev, `> Job #${job_id} queued successfully.`]);
+    } catch (error) {
+      console.error(error);
+      setLogs((prev) => [...prev, "> ❌ Error: Failed to contact backend."]);
+      setIsGenerating(false);
     }
-
-    // Call your actual API here later
-    // await fetch(`/api/generate/${repo.id}`);
-
-    setIsGenerating(false);
-    setShowDocs(true);
   };
+
+  useEffect(() => {
+    if (!jobId) return;
+
+    const poll = setInterval(async () => {
+      try {
+        const res = await axios.get(
+          `http://localhost:8000/api/generate/status/${jobId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+              Accept: "application/json",
+            },
+          }
+        );
+        const status = res.data.status;
+
+        if (status === "pending") {
+          setLogs((prev) => {
+            if (
+              prev[prev.length - 1] ===
+              "> System is analyzing repository structure..."
+            )
+              return prev;
+            return [...prev, "> System is analyzing repository structure..."];
+          });
+        } else if (status === "completed") {
+          setLogs((prev) => [
+            ...prev,
+            "> ✅ Analysis Complete. Rendering Output.",
+          ]);
+          setResult(res.data.result);
+          setIsGenerating(false);
+          setJobId(null);
+        } else if (status === "failed") {
+          setLogs((prev) => [...prev, "> ❌ Job failed on server side."]);
+          setIsGenerating(false);
+          setJobId(null);
+        }
+      } catch (e) {
+        console.error("Polling error", e);
+      }
+    }, 3000);
+
+    setPollingInterval(poll);
+
+    return () => clearInterval(poll);
+  }, [jobId]);
 
   return (
     <div className="space-y-6">
-      {/* Navigation Breadcrumb */}
       <Link
         href="/dashboard"
         className="inline-flex items-center text-slate-400 hover:text-cyan-400 transition-colors gap-2 text-sm mb-4 group"
@@ -69,111 +153,61 @@ export default function RepoDetailView({ repo }: RepoDetailViewProps) {
         Back to Command Center
       </Link>
 
-      {/* Header Card */}
       <div className="bg-slate-900/50 border border-white/10 rounded-xl p-6 backdrop-blur-sm relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-4 opacity-10">
-          <FileText className="w-32 h-32 text-cyan-500" />
-        </div>
-
         <div className="relative z-10">
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
-                {repo.name}
-                <span className="px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-mono">
-                  {repo.language}
-                </span>
-              </h1>
-              <p className="text-slate-400 max-w-2xl text-lg">
-                {repo.description}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex gap-6 text-sm text-slate-400 border-t border-white/5 pt-4 mt-4">
-            <div className="flex items-center gap-2">
-              <GitBranch className="w-4 h-4 text-purple-400" />
-              <span>{repo.branch}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Star className="w-4 h-4 text-yellow-400" />
-              <span>{repo.stars} stars</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-blue-400" />
-              <span>Updated {repo.lastUpdated}</span>
-            </div>
-          </div>
+          <h1 className="text-3xl font-bold text-white mb-2">{repo.name}</h1>
+          <p className="text-slate-400">{repo.description}</p>
         </div>
       </div>
 
-      {/* Action Area */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: Controls */}
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-white/10 rounded-xl p-6">
             <h2 className="text-white font-semibold flex items-center gap-2 mb-4">
               <Bot className="w-5 h-5 text-cyan-400" />
               Generator Controls
             </h2>
-
             <p className="text-sm text-slate-400 mb-6">
-              Initiate the neural network to parse your codebase and generate
-              comprehensive markdown documentation.
+              Initiate the neural network to parse your codebase.
             </p>
 
             <button
               onClick={handleGenerate}
-              disabled={isGenerating}
+              disabled={isGenerating || !!result}
               className={`w-full py-4 rounded-lg font-bold flex items-center justify-center gap-2 transition-all relative overflow-hidden group ${
-                isGenerating
+                isGenerating || result
                   ? "bg-slate-800 text-slate-500 cursor-not-allowed"
                   : "bg-cyan-600 hover:bg-cyan-500 text-white shadow-lg shadow-cyan-900/20"
               }`}
             >
               {isGenerating ? (
-                <>
-                  <RefreshCw className="w-5 h-5 animate-spin" />
-                  Processing...
-                </>
+                <RefreshCw className="w-5 h-5 animate-spin" />
+              ) : result ? (
+                <>Done</>
               ) : (
                 <>
-                  <Zap className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                  <Zap className="w-5 h-5" />
                   Generate Documentation
                 </>
               )}
             </button>
           </div>
         </div>
-
-        {/* Right Column: Terminal / Output */}
-        <div className="lg:col-span-2">
-          <div className="bg-[#0c0c14] border border-white/10 rounded-xl overflow-hidden flex flex-col min-h-[400px]">
-            {/* Terminal Header */}
-            <div className="bg-white/5 px-4 py-2 border-b border-white/5 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Terminal className="w-4 h-4 text-slate-500" />
-                <span className="text-xs font-mono text-slate-400">
-                  system_output.log
-                </span>
-              </div>
-              <div className="flex gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full bg-red-500/20" />
-                <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20" />
-                <div className="w-2.5 h-2.5 rounded-full bg-green-500/20" />
-              </div>
+      </div>
+      <div className="lg:col-span-2">
+        <div className="bg-[#0c0c14] border border-white/10 rounded-xl overflow-hidden flex flex-col min-h-[400px]">
+          <div className="bg-white/5 px-4 py-2 border-b border-white/5 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Terminal className="w-4 h-4 text-slate-500" />
+              <span className="text-xs font-mono text-slate-400">
+                system_output.log
+              </span>
             </div>
+          </div>
 
-            {/* Terminal Content */}
-            <div className="p-6 font-mono text-sm overflow-y-auto flex-1">
-              {!isGenerating && logs.length === 0 && !showDocs && (
-                <div className="h-full flex flex-col items-center justify-center text-slate-600 gap-3">
-                  <Terminal className="w-12 h-12 opacity-20" />
-                  <p>Ready to analyze repository...</p>
-                </div>
-              )}
-
-              <div className="space-y-2">
+          <div className="p-6 font-mono text-sm overflow-y-auto flex-1 max-h-[600px]">
+            {!result && (
+              <div className="space-y-2 mb-6">
                 {logs.map((log, i) => (
                   <motion.div
                     key={i}
@@ -184,63 +218,40 @@ export default function RepoDetailView({ repo }: RepoDetailViewProps) {
                     {log}
                   </motion.div>
                 ))}
-
-                {showDocs && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="mt-6 pt-6 border-t border-dashed border-white/10 text-slate-300"
-                  >
-                    <div className="flex items-center gap-2 text-green-400 mb-4">
-                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                      Documentation Generated Successfully
-                    </div>
-                    {/* Placeholder for MD Preview */}
-                    <div className="bg-white/5 p-4 rounded border border-white/5">
-                      <h1 className="text-xl font-bold text-white mb-2">
-                        # {repo.name}
-                      </h1>
-                      <p className="mb-4">
-                        This project implements a high-performance neural
-                        network...
-                      </p>
-                      <h2 className="text-lg font-semibold text-white mb-2">
-                        ## Installation
-                      </h2>
-                      <code className="bg-black/30 px-2 py-1 rounded text-cyan-300">
-                        npm install {repo.name}
-                      </code>
-                    </div>
-                  </motion.div>
+                {isGenerating && (
+                  <div className="text-slate-500 animate-pulse">_</div>
                 )}
               </div>
-            </div>
+            )}
+
+            {result && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="space-y-8"
+              >
+                <div className="prose prose-invert max-w-none">
+                  <h2 className="text-xl text-green-400">Analysis Summary</h2>
+                  <p className="text-slate-300">{result.summary}</p>
+                </div>
+
+                {result.architecture_diagram && (
+                  <div className="border border-white/10 rounded p-4 bg-slate-900/50">
+                    <h3 className="text-sm text-slate-400 mb-2 uppercase tracking-wider">
+                      Architecture Diagram
+                    </h3>
+                    <MermaidDiagram code={result.architecture_diagram} />
+                  </div>
+                )}
+
+                <div className="prose prose-invert max-w-none bg-white/5 p-6 rounded-lg">
+                  <ReactMarkdown>{result.readme}</ReactMarkdown>
+                </div>
+              </motion.div>
+            )}
           </div>
         </div>
       </div>
     </div>
-  );
-}
-
-// Helper component for spinning icon
-function RefreshCw({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-      <path d="M21 3v5h-5" />
-      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-      <path d="M3 21v-5h5" />
-    </svg>
   );
 }

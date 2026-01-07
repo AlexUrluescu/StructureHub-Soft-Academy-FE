@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import RepoDetailView from "../_components/RepoDetailView";
+import { html } from "framer-motion/client";
 
 interface GithubRepo {
   id: number;
@@ -21,6 +22,13 @@ interface GithubRepo {
 async function getToken() {
   const cookieStore = await cookies();
   const token = cookieStore.get("github_token")?.value;
+  if (!token) return null;
+  return token;
+}
+
+async function getAuthToken() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("auth_token")?.value;
   if (!token) return null;
   return token;
 }
@@ -66,8 +74,9 @@ export default async function DocumentationRepoIdPage({
 }) {
   const { id } = await params;
   const token = await getToken();
+  const auth_token = await getAuthToken();
 
-  if (!token) {
+  if (!token || !auth_token) {
     redirect("/dashboard");
   }
 
@@ -89,11 +98,12 @@ export default async function DocumentationRepoIdPage({
       day: "numeric",
     }),
     branch: repoData.default_branch,
+    html_url: repoData.html_url,
   };
 
   return (
     <div className="max-w-6xl mx-auto">
-      <RepoDetailView repo={formattedRepo} />
+      <RepoDetailView repo={formattedRepo} authToken={auth_token} />
     </div>
   );
 }
