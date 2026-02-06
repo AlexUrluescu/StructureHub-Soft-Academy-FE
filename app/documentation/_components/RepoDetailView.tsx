@@ -10,6 +10,7 @@ import mermaid from "mermaid";
 import RefreshCw from "./IconHelper";
 import ModeSelector from "./ModeSelector";
 import GenerationFlowEntity from "@/flows/generation";
+import MermaidDiagram from "./MermaidDiagram";
 
 if (typeof window !== "undefined") {
   mermaid.initialize({ startOnLoad: false, theme: "dark" });
@@ -47,7 +48,7 @@ export default function RepoDetailView({
   const [jobId, setJobId] = useState<number | null>(null);
   const [result, setResult] = useState<JobResult | null>(null);
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(
-    null
+    null,
   );
 
   const handleGenerate = async (isTechnical: boolean) => {
@@ -111,6 +112,8 @@ export default function RepoDetailView({
             ...prev,
             "> ✅ Analysis Complete. Rendering Output.",
           ]);
+          console.log("responseData.result", responseData.result);
+
           setResult(responseData.result);
           setIsGenerating(false);
           setJobId(null);
@@ -128,6 +131,10 @@ export default function RepoDetailView({
 
     return () => clearInterval(poll);
   }, [jobId]);
+
+  const handleSaveAnalysis = () => {
+    console.log("result", result);
+  };
 
   return (
     <div className="space-y-6">
@@ -199,6 +206,16 @@ export default function RepoDetailView({
                 </>
               )}
             </button>
+            {result ? (
+              <div style={{ display: "flex", justifyContent: "center" }}>
+                <button
+                  onClick={handleSaveAnalysis}
+                  className="mt-4 bg-purple-900/20 border border-purple-500/50 hover:bg-purple-500/20 text-purple-400 hover:text-purple-300 py-2 px-4 rounded-lg transition-colors"
+                >
+                  Save Analysis
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -260,6 +277,16 @@ export default function RepoDetailView({
                         </h2>
                         <p className="text-slate-300 mb-4">{result.summary}</p>
                       </div>
+
+                      {result.architecture_diagram && (
+                        <div className="border border-white/10 rounded-lg overflow-hidden">
+                          <div className="bg-white/5 px-4 py-2 text-xs font-mono text-slate-400 border-b border-white/5">
+                            Architecture Diagram
+                          </div>
+                          <MermaidDiagram code={result.architecture_diagram} />
+                        </div>
+                      )}
+
                       <div className="prose prose-invert max-w-none">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
                           {result.readme}
@@ -274,34 +301,33 @@ export default function RepoDetailView({
                       <h2 className="text-2xl text-white font-light">
                         Project Executive Summary
                       </h2>
-                      <p className="text-lg text-slate-300 leading-relaxed max-w-2xl mx-auto">
-                        {result.summary}
-                      </p>
+                      <>
+                        <div className="border border-purple-500/20 bg-purple-900/10 p-4 rounded-lg">
+                          <h2 className="text-xl text-purple-400 mb-2 font-bold">
+                            System Architecture
+                          </h2>
+                          <p className="text-slate-300 mb-4">
+                            {result.summary}
+                          </p>
+                        </div>
 
-                      <div className="grid grid-cols-3 gap-4 text-left mt-8 pt-8 border-t border-white/10">
-                        <div>
-                          <h4 className="text-slate-500 text-xs uppercase tracking-wider mb-1">
-                            Tech Stack
-                          </h4>
-                          <span className="text-white">React, Node, AI</span>
+                        {result.architecture_diagram && (
+                          <div className="border border-white/10 rounded-lg overflow-hidden">
+                            <div className="bg-white/5 px-4 py-2 text-xs font-mono text-slate-400 border-b border-white/5">
+                              Architecture Diagram
+                            </div>
+                            <MermaidDiagram
+                              code={result.architecture_diagram}
+                            />
+                          </div>
+                        )}
+
+                        <div className="prose prose-invert max-w-none">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {result.readme}
+                          </ReactMarkdown>
                         </div>
-                        <div>
-                          <h4 className="text-slate-500 text-xs uppercase tracking-wider mb-1">
-                            Complexity
-                          </h4>
-                          <span className="text-green-400">
-                            Low Maintenance
-                          </span>
-                        </div>
-                        <div>
-                          <h4 className="text-slate-500 text-xs uppercase tracking-wider mb-1">
-                            Status
-                          </h4>
-                          <span className="text-cyan-400">
-                            Production Ready
-                          </span>
-                        </div>
-                      </div>
+                      </>
                     </div>
                   )}
                 </motion.div>
