@@ -10,9 +10,8 @@ async function getRepos(token: string) {
           Authorization: `Bearer ${token}`,
           Accept: "application/vnd.github+json",
         },
-
         next: { revalidate: 60 },
-      }
+      },
     );
 
     if (!response.ok) {
@@ -43,7 +42,7 @@ export default async function Page() {
   }
 
   return (
-    <main className="container mx-auto p-6">
+    <main className="w-full">
       <DashboardPage
         isConnected={!!token && !error}
         repos={repos}
