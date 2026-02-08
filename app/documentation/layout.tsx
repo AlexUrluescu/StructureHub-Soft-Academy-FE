@@ -30,10 +30,38 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const router = useRouter();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [user, setUser] = useState<any>(null);
+
+  const fetchUserData = async () => {
+    const token = Cookies.get("auth_token");
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+
+    const res = await fetch("http://localhost:8000/api/user", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    });
+
+    const data = await res.json();
+    if (data.error) {
+      router.push("/login");
+    }
+    console.log("User data:", data);
+    setUser(data);
+  };
 
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    fetchUserData();
+  }, []);
 
   const handleLogout = () => {
     Cookies.remove("auth_token");
@@ -48,6 +76,11 @@ export default function DashboardLayout({
         </div>
         <span className="font-bold text-lg tracking-wider text-white">
           GIT_SYNTH
+        </span>
+      </div>
+      <div>
+        <span className="text-slate-300 p-4 space-y-2 block text-cyan-400 bg-cyan-500/10">
+          Welcome back, {user?.first_name || "User"}
         </span>
       </div>
 
