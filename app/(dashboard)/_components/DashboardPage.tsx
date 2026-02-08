@@ -20,18 +20,8 @@ export default function Dashboard({
   const [filter, setFilter] = useState("");
 
   const filteredRepos = repos.filter((repo) =>
-    repo.name.toLowerCase().includes(filter.toLowerCase())
+    repo.name.toLowerCase().includes(filter.toLowerCase()),
   );
-
-  const handleTestClick = async () => {
-    console.log("Test button clicked!");
-
-    const res = await fetch("http://localhost:8000/api/generate/docs");
-
-    const data = await res.json();
-
-    console.log("Response from /api/generate/docs:", data);
-  };
 
   return (
     <div className="space-y-8">
@@ -106,7 +96,6 @@ export default function Dashboard({
               <span className="w-1 h-6 bg-cyan-500 rounded-full" />
               Available Repositories
             </h2>
-            <button onClick={handleTestClick}>click</button>
             <div className="w-64">
               <NeonInput
                 placeholder="Filter modules..."
